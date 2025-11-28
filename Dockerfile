@@ -48,8 +48,8 @@ RUN uv sync --no-dev
 # 复制后端代码
 COPY backend/ ./backend/
 
-# 复制配置文件（包含 API Key）
-COPY text_providers.yaml ./text_providers.yaml
+# 复制配置文件模板（用户可在 Web 界面配置 API Key）
+COPY docker/text_providers.yaml ./text_providers.yaml
 COPY docker/image_providers.yaml ./image_providers.yaml
 
 # 从构建阶段复制前端产物
