@@ -406,3 +406,25 @@ providers:
 - `README.md` (添加更新日志)
 
 **仓库地址：** https://github.com/changchuan123/redlnk
+
+### 2025-11-28 - 修复 Zeabur 部署信号错误
+
+**会话目的：** 修复在 Zeabur 部署时出现的 "signal only works in main thread" 错误
+
+**完成的主要任务：**
+1. ✅ 修复 `backend/utils/genai_client.py` 中的信号处理问题
+2. ✅ 将 `signal.SIGALRM` 替换为线程安全的 `threading.Timer` 和 `threading.Event`
+3. ✅ 确保超时机制在多线程环境中正常工作
+
+**关键决策和解决方案：**
+- 问题原因：`signal.SIGALRM` 只能在主线程中使用，Flask 的请求处理在子线程中执行
+- 解决方案：使用 `threading.Timer` 和 `threading.Event` 实现线程安全的超时机制
+- 在流式响应循环中检查超时标志，避免阻塞
+
+**使用的技术栈：**
+- Python threading 模块
+- threading.Timer 和 threading.Event
+
+**修改的文件：**
+- `backend/utils/genai_client.py` (修复超时处理机制)
+- `README.md` (添加更新日志)
