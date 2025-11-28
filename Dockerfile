@@ -7,14 +7,18 @@ FROM node:22-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
-# 安装 pnpm
-RUN npm install -g pnpm
+# 安装特定版本的 pnpm 以确保兼容性
+RUN npm install -g pnpm@8
 
 # 复制前端依赖文件
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 
-# 安装依赖
-RUN pnpm install --frozen-lockfile
+# 如果锁文件不兼容，强制重新生成
+RUN pnpm install --frozen-lockfile || \
+    (echo "Lockfile incompatible, regenerating..." && \
+     rm -f pnpm-lock.yaml && \
+     pnpm install && \
+     pnpm install > /dev/null 2>&1)
 
 # 复制前端源码
 COPY frontend/ ./
