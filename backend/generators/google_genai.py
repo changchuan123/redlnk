@@ -4,7 +4,7 @@ import time
 import random
 import base64
 from functools import wraps
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from google import genai
 from google.genai import types
 from .base import ImageGeneratorBase
@@ -389,6 +389,7 @@ class GoogleGenAIGenerator(ImageGeneratorBase):
         temperature: float = 1.0,
         model: str = "gemini-3-pro-image-preview",
         reference_image: Optional[bytes] = None,
+        reference_images: Optional[List[bytes]] = None,
         **kwargs
     ) -> bytes:
         """
@@ -399,33 +400,48 @@ class GoogleGenAIGenerator(ImageGeneratorBase):
             aspect_ratio: 宽高比 (如 "3:4", "1:1", "16:9")
             temperature: 温度
             model: 模型名称
-            reference_image: 参考图片二进制数据（用于保持风格一致）
+            reference_image: 单张参考图片二进制数据（向后兼容）
+            reference_images: 多张参考图片列表（优先使用）
             **kwargs: 其他参数
 
         Returns:
             图片二进制数据
         """
         logger.info(f"Google GenAI 生成图片: model={model}, aspect_ratio={aspect_ratio}")
-        logger.debug(f"  prompt 长度: {len(prompt)} 字符, 有参考图: {reference_image is not None}")
+        
+        # 合并所有参考图片
+        all_reference_images = []
+        if reference_images and len(reference_images) > 0:
+            all_reference_images.extend(reference_images)
+        if reference_image and reference_image not in all_reference_images:
+            all_reference_images.append(reference_image)
+        
+        logger.debug(f"  prompt 长度: {len(prompt)} 字符, 参考图数量: {len(all_reference_images)}")
 
         # 构建 parts 列表
         parts = []
 
-        # 如果有参考图，先添加参考图和说明
-        if reference_image:
-            logger.debug(f"  添加参考图片 ({len(reference_image)} bytes)")
-            # 压缩参考图到 200KB 以内
-            compressed_ref = compress_image(reference_image, max_size_kb=200)
-            logger.debug(f"  参考图压缩后: {len(compressed_ref)} bytes")
-            # 添加参考图
-            parts.append(types.Part(
-                inline_data=types.Blob(
-                    mime_type="image/png",
-                    data=compressed_ref
-                )
-            ))
+        # 如果有参考图，先添加所有参考图和说明
+        if all_reference_images:
+            logger.debug(f"  添加 {len(all_reference_images)} 张参考图片")
+            # 添加所有参考图
+            for idx, ref_img in enumerate(all_reference_images):
+                logger.debug(f"  参考图 {idx + 1}: {len(ref_img)} bytes")
+                # 压缩参考图到 200KB 以内
+                compressed_ref = compress_image(ref_img, max_size_kb=200)
+                logger.debug(f"  参考图 {idx + 1} 压缩后: {len(compressed_ref)} bytes")
+                # 添加参考图
+                parts.append(types.Part(
+                    inline_data=types.Blob(
+                        mime_type="image/png",
+                        data=compressed_ref
+                    )
+                ))
+            
             # 添加带参考说明的提示词
-            enhanced_prompt = f"""请参考上面这张图片的视觉风格（包括配色、排版风格、字体风格、装饰元素风格），生成一张风格一致的新图片。
+            ref_count = len(all_reference_images)
+            if ref_count == 1:
+                enhanced_prompt = f"""请参考上面这张图片的视觉风格（包括配色、排版风格、字体风格、装饰元素风格、产品外观等），生成一张风格一致的新图片。
 
 新图片的内容要求：
 {prompt}
@@ -434,7 +450,20 @@ class GoogleGenAIGenerator(ImageGeneratorBase):
 1. 必须保持与参考图相同的视觉风格和设计语言
 2. 配色方案要与参考图协调一致
 3. 排版和装饰元素的风格要统一
-4. 但内容要按照新的要求来生成"""
+4. 如果参考图中有产品（如冰箱、家具等），新图片中也要包含相同或相似的产品
+5. 但内容要按照新的要求来生成"""
+            else:
+                enhanced_prompt = f"""请参考上面这 {ref_count} 张图片的视觉风格（包括配色、排版风格、字体风格、装饰元素风格、产品外观等），生成一张风格一致的新图片。
+
+新图片的内容要求：
+{prompt}
+
+重要：
+1. 必须保持与参考图相同的视觉风格和设计语言
+2. 配色方案要与参考图协调一致
+3. 排版和装饰元素的风格要统一
+4. 如果参考图中有产品（如冰箱、家具等），新图片中也要包含相同或相似的产品
+5. 但内容要按照新的要求来生成"""
             parts.append(types.Part(text=enhanced_prompt))
         else:
             # 没有参考图，直接使用原始提示词

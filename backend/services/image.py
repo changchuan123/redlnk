@@ -168,12 +168,23 @@ class ImageService:
                 # 调用生成器生成图片
                 if self.provider_config.get('type') == 'google_genai':
                     logger.debug(f"  使用 Google GenAI 生成器")
+                    # Google GenAI 支持多张参考图片
+                    # 组合参考图片：用户上传的图片 + 封面图
+                    reference_images = []
+                    if user_images:
+                        reference_images.extend(user_images)
+                        logger.debug(f"  添加 {len(user_images)} 张用户上传的参考图片")
+                    if reference_image:
+                        reference_images.append(reference_image)
+                        logger.debug(f"  添加封面图作为参考")
+                    
                     image_data = self.generator.generate_image(
                         prompt=prompt,
                         aspect_ratio=self.provider_config.get('default_aspect_ratio', '3:4'),
                         temperature=self.provider_config.get('temperature', 1.0),
                         model=self.provider_config.get('model', 'gemini-3-pro-image-preview'),
-                        reference_image=reference_image,
+                        reference_images=reference_images if reference_images else None,
+                        reference_image=None,  # 已合并到 reference_images 中
                     )
                 elif self.provider_config.get('type') == 'image_api':
                     logger.debug(f"  使用 Image API 生成器")
