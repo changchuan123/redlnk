@@ -1,0 +1,20 @@
+# Zeabur 忽略文件
+.git/
+.gitignore
+*.md
+!README.md
+!ZEABUR_DEPLOY.md
+history/
+output/
+*.log
+.env
+.env.local
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+venv/
+.DS_Store
+*.tmp
+*.temp
+

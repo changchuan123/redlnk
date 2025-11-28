@@ -152,13 +152,96 @@ class OutlineService:
             max_output_tokens = provider_config.get('max_output_tokens', 8000)
 
             logger.info(f"调用文本生成 API: model={model}, temperature={temperature}")
-            outline_text = self.client.generate_text(
-                prompt=prompt,
-                model=model,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-                images=images
+            
+            # 检查模型是否支持图片输入
+            provider_type = provider_config.get('type', '')
+            supports_images = provider_type == 'google_gemini' or (
+                provider_type == 'openai_compatible' and 
+                'gpt-4' in model.lower() and 'vision' in model.lower()
             )
+            
+            # 如果有图片输入但当前模型不支持，自动切换到支持图片的模型
+            if images and len(images) > 0 and not supports_images:
+                logger.warning(
+                    f"当前模型 {model} 不支持图片输入，"
+                    f"检测到 {len(images)} 张参考图片，尝试切换到支持图片的模型..."
+                )
+                
+                # 查找支持图片的模型（优先使用 Gemini）
+                providers = self.text_config.get('providers', {})
+                gemini_provider = providers.get('gemini')
+                
+                if gemini_provider and gemini_provider.get('api_key'):
+                    try:
+                        logger.info(f"切换到 Gemini 模型以支持图片输入")
+                        # 切换到 Gemini
+                        active_provider = 'gemini'
+                        provider_config = gemini_provider
+                        model = provider_config.get('model', 'gemini-2.0-flash')
+                        temperature = provider_config.get('temperature', 1.0)
+                        max_output_tokens = provider_config.get('max_output_tokens', 8000)
+                        supports_images = True
+                        
+                        # 重新获取客户端
+                        self.client = get_text_chat_client(provider_config)
+                        logger.info(f"已切换到 Gemini: model={model}")
+                    except Exception as e:
+                        logger.error(f"切换到 Gemini 失败: {str(e)}")
+                        logger.warning(
+                            f"Gemini 连接失败，将使用当前模型并忽略参考图片。"
+                            f"提示词中已包含图片描述信息。"
+                        )
+                        images = None
+                        supports_images = False
+                else:
+                    logger.warning(
+                        f"未找到可用的支持图片的模型，将忽略参考图片。"
+                        f"提示词中已包含图片描述信息。"
+                    )
+                    images = None
+            
+            # 尝试生成大纲，如果 Gemini 连接失败则回退到 DeepSeek
+            try:
+                outline_text = self.client.generate_text(
+                    prompt=prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                    images=images if supports_images else None
+                )
+            except Exception as e:
+                error_str = str(e)
+                # 如果是网络连接错误或超时，且当前使用的是 Gemini，回退到 DeepSeek
+                if ('timeout' in error_str.lower() or 
+                    'connection' in error_str.lower() or 
+                    'network' in error_str.lower() or
+                    'unreachable' in error_str.lower()) and supports_images:
+                    logger.error(f"Gemini API 连接失败: {error_str[:200]}")
+                    logger.warning("回退到 DeepSeek 模型，忽略参考图片")
+                    
+                    # 回退到原始配置
+                    active_provider = self.text_config.get('active_provider', 'deepseek')
+                    providers = self.text_config.get('providers', {})
+                    provider_config = providers.get(active_provider, {})
+                    model = provider_config.get('model', 'deepseek-chat')
+                    temperature = provider_config.get('temperature', 1.0)
+                    max_output_tokens = provider_config.get('max_output_tokens', 8000)
+                    
+                    # 重新获取客户端
+                    self.client = get_text_chat_client(provider_config)
+                    images = None  # 忽略图片
+                    
+                    # 重试生成（不使用图片）
+                    outline_text = self.client.generate_text(
+                        prompt=prompt,
+                        model=model,
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        images=None
+                    )
+                else:
+                    # 其他错误直接抛出
+                    raise
 
             logger.debug(f"API 返回文本长度: {len(outline_text)} 字符")
             pages = self._parse_outline(outline_text)

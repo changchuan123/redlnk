@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from pathlib import Path
 from flask import Flask, send_from_directory
@@ -151,8 +152,9 @@ def _validate_config_on_startup(logger):
 
 if __name__ == '__main__':
     app = create_app()
+    port = int(os.getenv('PORT', Config.PORT))
     app.run(
         host=Config.HOST,
-        port=Config.PORT,
+        port=port,
         debug=Config.DEBUG
     )

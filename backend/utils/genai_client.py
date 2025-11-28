@@ -162,14 +162,39 @@ class GenAIClient:
         generate_content_config = types.GenerateContentConfig(**config_kwargs)
 
         result = ""
-        for chunk in self.client.models.generate_content_stream(
-            model=model,
-            contents=contents,
-            config=generate_content_config,
-        ):
-            if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
-                continue
-            result += chunk.text
+        try:
+            # 添加超时处理，使用 signal 或 threading 实现超时
+            import signal
+            
+            class TimeoutError(Exception):
+                pass
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Gemini API 请求超时（60秒）")
+            
+            # 设置 60 秒超时
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(60)
+            
+            try:
+                for chunk in self.client.models.generate_content_stream(
+                    model=model,
+                    contents=contents,
+                    config=generate_content_config,
+                ):
+                    if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                        continue
+                    result += chunk.text
+            finally:
+                signal.alarm(0)  # 取消超时
+                
+        except TimeoutError:
+            raise Exception("Gemini API 请求超时，可能是网络连接问题。请检查服务器网络或稍后重试。")
+        except Exception as e:
+            error_str = str(e)
+            if 'timeout' in error_str.lower() or 'connection' in error_str.lower():
+                raise Exception(f"无法连接到 Gemini API: {error_str[:200]}\n请检查服务器网络连接或防火墙设置。")
+            raise
 
         return result
 

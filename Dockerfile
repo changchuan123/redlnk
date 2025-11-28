@@ -45,8 +45,9 @@ RUN uv sync --no-dev
 COPY backend/ ./backend/
 
 # 复制空白配置文件模板（不包含任何 API Key）
-COPY docker/text_providers.yaml ./
-COPY docker/image_providers.yaml ./
+# 注意：Zeabur 部署时，需要在部署后通过 Web 界面或环境变量配置 API Key
+COPY docker/text_providers.yaml ./text_providers.yaml
+COPY docker/image_providers.yaml ./image_providers.yaml
 
 # 从构建阶段复制前端产物
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
@@ -54,17 +55,17 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # 创建输出目录
 RUN mkdir -p output
 
-# 设置环境变量
+# 设置环境变量（Zeabur 会自动设置 PORT 环境变量）
 ENV FLASK_DEBUG=False
 ENV FLASK_HOST=0.0.0.0
-ENV FLASK_PORT=12398
+ENV FLASK_PORT=10008
 
-# 暴露端口
-EXPOSE 12398
+# 暴露端口（Zeabur 会自动映射，这里使用默认端口）
+EXPOSE 10008
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:12398/api/health')" || exit 1
+# 健康检查（Zeabur 会自动处理，这里保留作为备用）
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD python -c "import os, urllib.request; port=os.getenv('PORT', '10008'); urllib.request.urlopen(f'http://localhost:{port}/api/health')" || exit 1
 
 # 启动命令
 CMD ["uv", "run", "python", "-m", "backend.app"]

@@ -5,12 +5,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+import os
+
 class Config:
-    DEBUG = True
-    HOST = '0.0.0.0'
-    PORT = 12398
-    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000']
-    OUTPUT_DIR = 'output'
+    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    HOST = os.getenv('FLASK_HOST', '0.0.0.0')
+    PORT = int(os.getenv('PORT', os.getenv('FLASK_PORT', '10008')))
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000').split(',')
+    OUTPUT_DIR = os.getenv('OUTPUT_DIR', 'output')
 
     _image_providers_config = None
     _text_providers_config = None
