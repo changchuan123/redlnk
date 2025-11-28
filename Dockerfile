@@ -48,9 +48,8 @@ RUN uv sync --no-dev
 # 复制后端代码
 COPY backend/ ./backend/
 
-# 复制空白配置文件模板（不包含任何 API Key）
-# 注意：Zeabur 部署时，需要在部署后通过 Web 界面或环境变量配置 API Key
-COPY docker/text_providers.yaml ./text_providers.yaml
+# 复制配置文件（包含 API Key）
+COPY text_providers.yaml ./text_providers.yaml
 COPY docker/image_providers.yaml ./image_providers.yaml
 
 # 从构建阶段复制前端产物
