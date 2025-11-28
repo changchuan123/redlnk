@@ -21,12 +21,12 @@ providers:
   # DeepSeek 配置（主要用于文本生成，成本低）
   deepseek:
     api_key: ""  # 从 https://platform.deepseek.com/ 获取 API Key
-    base_url: https://api.deepseek.com/v1
+    base_url: https://api.deepseek.com  # 代码会自动处理路径
     max_output_tokens: 8000
     model: deepseek-chat
     temperature: 0.7
     type: openai_compatible
-    endpoint_type: /chat/completions
+    endpoint_type: /v1/chat/completions  # 完整的端点路径
 
   # Google Gemini 配置（支持图片+文本，作为 DeepSeek 的后备）
   gemini:
