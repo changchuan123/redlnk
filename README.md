@@ -428,3 +428,29 @@ providers:
 **修改的文件：**
 - `backend/utils/genai_client.py` (修复超时处理机制)
 - `README.md` (添加更新日志)
+
+### 2025-11-28 - 修复图片生成参考图片问题
+
+**会话目的：** 修复用户上传的参考图片没有被使用的问题
+
+**完成的主要任务：**
+1. ✅ 修复 Google GenAI 生成器不支持多张参考图片的问题
+2. ✅ 确保用户上传的图片能够正确传递到生成器
+3. ✅ 优化提示词，明确要求保持产品外观一致（如冰箱等）
+
+**关键决策和解决方案：**
+- 问题原因：Google GenAI 生成器只支持单张参考图片（reference_image），用户上传的图片（user_images）没有被传递
+- 解决方案：
+  - 扩展 `GoogleGenAIGenerator.generate_image` 方法，支持 `reference_images` 参数（多张参考图片）
+  - 修改 `ImageService._generate_single_image` 方法，在调用 Google GenAI 时组合用户上传的图片和封面图
+  - 优化提示词，明确要求保持产品外观一致
+- 现在支持：用户上传的图片 + 封面图 同时作为参考
+
+**使用的技术栈：**
+- Google GenAI API（支持多模态输入）
+- 图片压缩优化（200KB 以内）
+
+**修改的文件：**
+- `backend/generators/google_genai.py` (支持多张参考图片)
+- `backend/services/image.py` (传递用户上传的图片到生成器)
+- `README.md` (添加更新日志)
